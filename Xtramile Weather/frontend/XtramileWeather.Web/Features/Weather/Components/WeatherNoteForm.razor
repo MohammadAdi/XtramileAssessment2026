@@ -1,0 +1,88 @@
+@using XtramileWeather.Web.Api.Contracts
+@inject XtramileWeather.Web.Services.WeatherApiClient ApiClient
+
+<section class="card border-0 shadow-sm h-100" aria-labelledby="note-title">
+    <div class="card-body p-4">
+        <p class="text-uppercase text-primary small fw-semibold mb-1">Weather note</p>
+        <h2 id="note-title" class="h4 mb-2">Save an observation</h2>
+        <p class="text-body-secondary small mb-4">
+            @(CityId.HasValue ? $"Add a note for {CityName}." : "Select a city and view its weather first.")
+        </p>
+
+        <div class="mb-3">
+            <label class="form-label fw-medium" for="weather-note">Your note</label>
+            <textarea id="weather-note" class="form-control" rows="5" maxlength="500"
+                      disabled="@(!CityId.HasValue || isSaving)" @bind="text"
+                      placeholder="For example: Bring an umbrella after 3 PM."></textarea>
+            <div class="form-text">Maximum 500 characters.</div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(message))
+        {
+            <p class="small @(saveSucceeded ? "text-success" : "text-danger")" role="status">@message</p>
+        }
+
+        <button class="btn btn-primary w-100" type="button"
+                disabled="@(!CityId.HasValue || string.IsNullOrWhiteSpace(text) || isSaving)"
+                @onclick="SaveAsync">
+            @(isSaving ? "Saving..." : "Save note")
+        </button>
+    </div>
+</section>
+
+@code {
+    [Parameter]
+    public int? CityId { get; set; }
+
+    [Parameter]
+    public string? CityName { get; set; }
+
+    private int? previousCityId;
+    private string text = string.Empty;
+    private string? message;
+    private bool isSaving;
+    private bool saveSucceeded;
+
+    protected override void OnParametersSet()
+    {
+        if (CityId != previousCityId)
+        {
+            text = string.Empty;
+            message = null;
+            previousCityId = CityId;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (!CityId.HasValue || string.IsNullOrWhiteSpace(text))
+        {
+            return;
+        }
+
+        isSaving = true;
+        message = null;
+        saveSucceeded = false;
+
+        try
+        {
+            var result = await ApiClient.CreateWeatherNoteAsync(
+                new CreateWeatherNoteRequest(CityId.Value, text));
+            text = string.Empty;
+            saveSucceeded = true;
+            message = $"Note saved with identifier {result.Id}.";
+        }
+        catch (HttpRequestException)
+        {
+            message = "Unable to save the note. Please try again.";
+        }
+        catch (TaskCanceledException)
+        {
+            message = "The request timed out. Please try again.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

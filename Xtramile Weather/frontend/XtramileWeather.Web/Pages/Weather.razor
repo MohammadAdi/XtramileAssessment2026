@@ -1,0 +1,226 @@
+@page "/"
+@using XtramileWeather.Web.Api.Contracts
+@inject XtramileWeather.Web.Services.WeatherApiClient ApiClient
+
+<PageTitle>Xtramile Weather</PageTitle>
+
+<main class="min-vh-100 bg-body-tertiary">
+    <nav class="navbar bg-white border-bottom">
+        <div class="container py-2">
+            <a class="navbar-brand fw-bold text-primary" href="/">Xtramile Weather</a>
+        </div>
+    </nav>
+
+    <section class="weather-hero text-white py-5">
+        <div class="container py-lg-4">
+            <p class="text-uppercase small fw-semibold mb-2 opacity-75">Weather dashboard</p>
+            <h1 class="display-6 fw-bold mb-3">Plan your day with clarity.</h1>
+            <p class="lead mb-0 col-lg-7">Choose a country and city to view current conditions and save a weather note.</p>
+        </div>
+    </section>
+
+    <div class="container py-4 py-lg-5">
+        <div class="row g-4">
+            <div class="col-12">
+                <section class="card border-0 shadow-sm" aria-labelledby="location-title">
+                    <div class="card-body p-4">
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-4">
+                            <div>
+                                <p class="text-uppercase text-primary small fw-semibold mb-1">Location</p>
+                                <h2 id="location-title" class="h4 mb-0">Choose a location</h2>
+                            </div>
+                            <span class="text-body-secondary small">Step 1 of 2</span>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-medium" for="country">Country</label>
+                                <select id="country"
+                                        class="form-select"
+                                        @bind="selectedCountryCode"
+                                        @bind:after="LoadCitiesAsync"
+                                        disabled="@isLoadingCountries"
+                                        aria-describedby="location-help">
+                                    <option value="">Select a country</option>
+                                    @foreach (var country in countries)
+                                    {
+                                        <option value="@country.Code">@country.Name</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-medium" for="city">City</label>
+                                <select id="city"
+                                        class="form-select"
+                                        @bind="selectedCityName"
+                                        @bind:after="LoadWeatherAsync"
+                                        disabled="@(string.IsNullOrWhiteSpace(selectedCountryCode) || isLoadingCities)">
+                                    <option value="">@(isLoadingCities ? "Loading cities..." : "Select a city")</option>
+                                    @foreach (var city in cities)
+                                    {
+                                        <option value="@city.Name">@city.Name</option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
+
+                        @if (isLoadingCountries || isLoadingCities)
+                        {
+                            <p id="location-help" class="form-text mb-0 mt-3">Loading location data...</p>
+                        }
+                        else if (!string.IsNullOrWhiteSpace(locationErrorMessage))
+                        {
+                            <p id="location-help" class="text-danger small mb-0 mt-3" role="alert">@locationErrorMessage</p>
+                        }
+                        else
+                        {
+                            <p id="location-help" class="form-text mb-0 mt-3">Choose a city to load its weather details.</p>
+                        }
+                    </div>
+                </section>
+            </div>
+
+            <div class="col-lg-7">
+                <XtramileWeather.Web.Features.Weather.Components.WeatherDisplay 
+                    Weather="@currentWeather"
+                    IsLoading="@isLoadingWeather"
+                    ErrorMessage="@weatherErrorMessage" />
+            </div>
+            <div class="col-lg-5">
+                <XtramileWeather.Web.Features.Weather.Components.WeatherNoteForm
+                    CityId="@(currentWeather is null
+                        ? (int?)null
+                        : cities.FirstOrDefault(city => city.Name == selectedCityName)?.Id)"
+                    CityName="@selectedCityName" />
+            </div>
+        </div>
+    </div>
+</main>
+
+@code {
+    private IReadOnlyList<CountryResponse> countries = [];
+    private IReadOnlyList<CityResponse> cities = [];
+    private WeatherResponse? currentWeather;
+    private bool isLoadingCities;
+    private bool isLoadingCountries;
+    private bool isLoadingWeather;
+    private string? locationErrorMessage;
+    private string? weatherErrorMessage;
+    private string? selectedCityName;
+    private string? selectedCountryCode;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCountriesAsync();
+    }
+
+    private async Task LoadCountriesAsync()
+    {
+        isLoadingCountries = true;
+        locationErrorMessage = null;
+
+        try
+        {
+            countries = await ApiClient.GetCountriesAsync();
+        }
+        catch (HttpRequestException)
+        {
+            locationErrorMessage = "Unable to load countries. Check that the backend is running.";
+        }
+        catch (TaskCanceledException)
+        {
+            locationErrorMessage = "The country request timed out. Please try again.";
+        }
+        finally
+        {
+            isLoadingCountries = false;
+        }
+    }
+
+    private async Task LoadCitiesAsync()
+    {
+        selectedCityName = null;
+        cities = [];
+        currentWeather = null;
+        locationErrorMessage = null;
+        weatherErrorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(selectedCountryCode))
+        {
+            return;
+        }
+
+        isLoadingCities = true;
+        try
+        {
+            var response = await ApiClient.GetCitiesByCountryAsync(selectedCountryCode);
+            cities = response.Cities;
+        }
+        catch (HttpRequestException exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            locationErrorMessage = "The selected country was not found.";
+        }
+        catch (HttpRequestException)
+        {
+            locationErrorMessage = "Unable to load cities. Please try again.";
+        }
+        catch (TaskCanceledException)
+        {
+            locationErrorMessage = "The city request timed out. Please try again.";
+        }
+        finally
+        {
+            isLoadingCities = false;
+        }
+    }
+
+    private async Task LoadWeatherAsync()
+    {
+        currentWeather = null;
+        weatherErrorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(selectedCityName))
+        {
+            return;
+        }
+
+        isLoadingWeather = true;
+        StateHasChanged(); // Force UI update for loading state
+        
+        try
+        {
+            currentWeather = await ApiClient.GetWeatherByCityAsync(selectedCityName);
+            weatherErrorMessage = null; // Clear any previous errors
+        }
+        catch (HttpRequestException exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            weatherErrorMessage = $"Weather data for '{selectedCityName}' was not found.";
+            currentWeather = null;
+        }
+        catch (HttpRequestException exception) when (exception.StatusCode == System.Net.HttpStatusCode.BadRequest)
+        {
+            weatherErrorMessage = "Invalid city name. Please select a different city.";
+            currentWeather = null;
+        }
+        catch (HttpRequestException exception)
+        {
+            weatherErrorMessage = $"Unable to load weather data: {exception.Message}";
+            currentWeather = null;
+        }
+        catch (TaskCanceledException)
+        {
+            weatherErrorMessage = "The weather request timed out. Please try again.";
+            currentWeather = null;
+        }
+        catch (Exception exception)
+        {
+            weatherErrorMessage = $"Unexpected error: {exception.Message}";
+            currentWeather = null;
+        }
+        finally
+        {
+            isLoadingWeather = false;
+            StateHasChanged(); // Force UI update after load complete
+        }
+    }
+}

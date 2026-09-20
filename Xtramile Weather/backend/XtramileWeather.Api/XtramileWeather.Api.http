@@ -1,0 +1,14 @@
+@baseUrl = http://localhost:5200
+
+GET {{baseUrl}}/api/status
+Accept: application/json
+
+###
+
+POST {{baseUrl}}/api/weather/notes
+Content-Type: application/json
+
+{
+  "cityId": 4,
+  "text": "Heavy rain after lunch."
+}

@@ -1,0 +1,124 @@
+@using XtramileWeather.Web.Api.Contracts
+
+<section class="card border-0 shadow-sm h-100" aria-labelledby="weather-title">
+    <div class="card-body p-4 d-flex flex-column">
+        <p class="text-uppercase text-primary small fw-semibold mb-1">Current weather</p>
+        <h2 id="weather-title" class="h4 mb-4">Weather details</h2>
+
+        @if (IsLoading)
+        {
+            <div class="text-center py-4 my-auto">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Loading weather data...</span>
+                </div>
+                <p class="text-body-secondary mb-0">Fetching weather information...</p>
+            </div>
+        }
+        else if (!string.IsNullOrWhiteSpace(ErrorMessage))
+        {
+            <div class="text-center py-4 my-auto">
+                <div class="weather-symbol mb-3" aria-hidden="true">⚠️</div>
+                <h3 class="h5 text-danger">Unable to load weather</h3>
+                <p class="text-body-secondary mb-0" role="alert">@ErrorMessage</p>
+            </div>
+        }
+        else if (Weather is not null)
+        {
+            <div class="mb-4">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <div class="weather-symbol-large" aria-hidden="true">@GetWeatherIcon(Weather.Condition)</div>
+                    <div>
+                        <h3 class="h2 mb-0">@Weather.City</h3>
+                        <p class="text-body-secondary mb-0">@Weather.CountryCode • @Weather.ObservedAtUtc.ToLocalTime().ToString("MMM dd, yyyy HH:mm")</p>
+                    </div>
+                </div>
+                <p class="h1 mb-1">@Weather.TemperatureCelsius.ToString("F1")°C <span class="text-body-secondary h4">/ @Weather.TemperatureFahrenheit.ToString("F1")°F</span></p>
+                <p class="text-body-secondary mb-0">@Weather.Condition</p>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-6">
+                    <div class="p-3 bg-light rounded">
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <span aria-hidden="true">💨</span>
+                            <p class="small text-body-secondary mb-0">Wind</p>
+                        </div>
+                        <p class="fw-semibold mb-0">@Weather.WindSpeed mph</p>
+                        <p class="small text-body-secondary mb-0">@Weather.WindDirectionDegrees°</p>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="p-3 bg-light rounded">
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <span aria-hidden="true">💧</span>
+                            <p class="small text-body-secondary mb-0">Humidity</p>
+                        </div>
+                        <p class="fw-semibold mb-0">@Weather.RelativeHumidityPercent%</p>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="p-3 bg-light rounded">
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <span aria-hidden="true">🌡️</span>
+                            <p class="small text-body-secondary mb-0">Dew Point</p>
+                        </div>
+                        <p class="fw-semibold mb-0">@Weather.DewPointFahrenheit.ToString("F1")°F</p>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="p-3 bg-light rounded">
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <span aria-hidden="true">📊</span>
+                            <p class="small text-body-secondary mb-0">Pressure</p>
+                        </div>
+                        <p class="fw-semibold mb-0">@Weather.PressureHpa hPa</p>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <div class="p-3 bg-light rounded">
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <span aria-hidden="true">👁️</span>
+                            <p class="small text-body-secondary mb-0">Visibility</p>
+                        </div>
+                        <p class="fw-semibold mb-0">@(Weather.VisibilityMeters / 1000.0) km</p>
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="text-center py-4 my-auto">
+                <div class="weather-symbol mb-3" aria-hidden="true">☀</div>
+                <h3 class="h5">Select a city to view the weather</h3>
+                <p class="text-body-secondary mb-0">Temperature, wind, pressure, humidity, and sky conditions will appear here.</p>
+            </div>
+        }
+    </div>
+</section>
+
+@code {
+    [Parameter]
+    public WeatherResponse? Weather { get; set; }
+
+    [Parameter]
+    public bool IsLoading { get; set; }
+
+    [Parameter]
+    public string? ErrorMessage { get; set; }
+
+    private string GetWeatherIcon(string condition)
+    {
+        return condition.ToLowerInvariant() switch
+        {
+            "clear" => "☀️",
+            "clouds" or "cloudy" => "☁️",
+            "rain" => "🌧️",
+            "drizzle" => "🌦️",
+            "thunderstorm" => "⛈️",
+            "snow" => "❄️",
+            "mist" or "fog" => "🌫️",
+            _ => "🌤️"
+        };
+    }
+}
+
